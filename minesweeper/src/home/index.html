@@ -1,0 +1,123 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Home</title>
+    </head>
+    <body>
+        <canvas id="minesweeper-canvas" width="800px" height="800px"></canvas>
+        <script type="module">
+            import * as ms from '/minesweeper_rs_wasm.js';
+            import * as ai from '/minesweeper_ai_wasm.js';
+            async function run() {
+                await ms.default();
+                await ai.default();
+                window.ms = ms;
+                window.ai = ai;
+
+                ai.kill("Clayton")
+
+                var game = ms.Game.new(50, 50, 100);
+                window.game = game;
+
+                const canvas = document.getElementById('minesweeper-canvas');
+                const ctx = canvas.getContext('2d');
+
+                canvas.addEventListener('mousedown', event => {
+                    var x = event.offsetX;
+                    var y = event.offsetY;
+
+                    var width = canvas.width;
+                    var height = canvas.height;
+
+                    var s = width < height ? width : height;
+                    var gs = game.width > game.height ? s/game.width : s/game.height;
+
+                    var cx = Math.floor(x/gs);
+                    var cy = Math.floor(y/gs);
+
+                    var cell = game.get_cell(cx, cy);
+
+                    if (
+                        event.button == 0 &&
+                        cell.cell_status == ms.CellStatus["Hidden"]
+                    ) {
+                        var killed = game.reveal_cell(cx, cy);
+                    } else if (
+                        event.button == 2 &&
+                        (
+                            cell.cell_status == ms.CellStatus["Hidden"] ||
+                            cell.cell_status == ms.CellStatus["Flagged"]
+                        )
+                    ) {
+                        game.toggle_cell_flag(cx, cy);
+                    }
+                });
+
+                canvas.addEventListener('contextmenu', event => {
+                    event.preventDefault();
+                    return false;
+                });
+
+                function render() {
+                    var width = canvas.width;
+                    var height = canvas.height;
+
+                    ctx.fillStyle = "#EEE";
+                    ctx.fillRect(0, 0, width, height);
+
+                    var s = width < height ? width : height;
+                    var gs = game.width > game.height ? s/game.width : s/game.height;
+                    for (let y = 0; y < game.height; y++) {
+                        for (let x = 0; x < game.width; x++) {
+                            let cell = game.get_cell(x, y);
+                            switch (cell.cell_status) {
+                                case (ms.CellStatus["Hidden"]):
+                                    ctx.fillStyle = "#8c8c8c";
+                                    ctx.fillRect(x*gs, y*gs, gs, gs);
+                                    break;
+                                case (ms.CellStatus["Flagged"]):
+                                    ctx.fillStyle = "#1c1c1c";
+                                    ctx.fillRect(x*gs, y*gs, gs, gs);
+                                    break;
+                                case (ms.CellStatus["Revealed"]):
+                                    ctx.fillStyle = "#BBB";
+                                    ctx.fillRect(x*gs, y*gs, gs, gs);
+
+                                    var neighboringBombCount = game.get_neighboring_bomb_count(x, y);
+
+                                    if (neighboringBombCount > 0) {
+                                        ctx.font = `${gs*0.75}px Arial`;
+                                        var measurement = ctx.measureText(neighboringBombCount);
+                                        var h = Math.abs(measurement.actualBoundingBoxAscent-measurement.actualBoundingBoxDescent);
+                                        var w = Math.abs(measurement.actualBoundingBoxLeft-measurement.actualBoundingBoxRight);
+                                        ctx.fillStyle = "#000";
+                                        ctx.fillText(neighboringBombCount, (x+0.5)*gs-w/2, (y+0.5)*gs+h/2);
+                                    }
+                                    break;
+                                case (ms.CellStatus["Killed"]):
+                                    ctx.fillStyle = "#d64b47";
+                                    ctx.fillRect(x*gs, y*gs, gs, gs);
+                                    break;
+                                default:
+                                    console.error(`Unkown CellStatus: ${cell.cell_status}`);
+                            }
+                        }
+                    }
+
+                    var gridWidth = Math.round(gs*0.05);
+                    ctx.fillStyle = "#000";
+                    for (let x = 0; x <= game.width; x++) {
+                        ctx.fillRect(x*gs-gridWidth/2, 0, gridWidth, s);
+                        for (let y = 0; y <= game.height; y++) {
+                            ctx.fillRect(0, y*gs-gridWidth/2, s, gridWidth);
+                        }
+                    }
+                }
+
+                setInterval(render, 0);
+            }
+
+            run();
+        </script>
+    </body>
+</html>
